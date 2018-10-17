@@ -1,10 +1,7 @@
 // Import here Polyfills if needed. Recommended core-js (npm i -D core-js)
   // import "core-js/fn/array.find"
   // ...
-import util from 'util';
-import crypto from 'crypto';
-import _ from 'lodash';
-import typeorm, { Entity, BeforeInsert, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm'
+import typeorm, { BeforeInsert, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm'
 import { Strategy } from 'passport-local';
 import bcrypt from 'bcrypt';
 import PassportOptions from './PassportOptions';

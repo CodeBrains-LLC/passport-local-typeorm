@@ -7,40 +7,14 @@ import _ from 'lodash';
 import typeorm, { Entity, BeforeInsert, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm'
 import { Strategy } from 'passport-local';
 import bcrypt from 'bcrypt';
+import PassportOptions from './PassportOptions';
 
-// The default option values
-const defaultAttachOptions = {
-  activationkeylen: 8,
-  resetPasswordkeylen: 8,
-  saltlen: 32,
-  iterations: 12000,
-  keylen: 512,
-  digest: 'sha1',
-  usernameField: 'username',
-  usernameLowerCase: false,
-  activationRequired: false,
-  hashField: 'hash',
-  saltField: 'salt',
-  activationKeyField: 'activationKey',
-  resetPasswordKeyField: 'resetPasswordKey',
-  incorrectPasswordError: 'Incorrect password',
-  incorrectUsernameError: 'Incorrect username',
-  invalidActivationKeyError: 'Invalid activation key',
-  invalidResetPasswordKeyError: 'Invalid reset password key',
-  missingUsernameError: 'Field %s is not set',
-  missingFieldError: 'Field %s is not set',
-  missingPasswordError: 'Password argument not set!',
-  userExistsError: 'User already exists with %s',
-  activationError: 'Email activation required',
-  noSaltValueStoredError: 'Authentication not possible. No salt value stored in db!'
-};
-
-export class PassportUserSchema extends BaseEntity {
-  options: object
-  constructor(options: object = defaultAttachOptions) {
-    super()
-    this.options = options
-  }
+export abstract class PassportUserSchema extends BaseEntity {
+  findByUsername: Promise<PassportUserSchema>;
+  static createStrategy: () => Strategy;
+  static findByUsername: (username: string) => Promise<PassportUserSchema>;
+  static authenticate: () => (username: any, password: any, cb: any) => void;
+  
   @PrimaryGeneratedColumn()
   id: number
 
@@ -48,29 +22,49 @@ export class PassportUserSchema extends BaseEntity {
   username: string
 
   @Column()
-  hash: string
-
-  @Column()
-  salt: string
-
-  @Column()
-  activationKey: string
-
-  @Column()
-  restorePasswordKey: string
+  password: string
 
   @Column()
   verified: boolean
 
-  secondPassword: string
 
-  validPassword(password: string, hashedPassword: string) {
-    return bcrypt.compareSync(password, hashedPassword);
-  }
-  
   @BeforeInsert()
-  updateDates() {
-    this. = new Date();
+  async hashPassword() {
+    const saltRounds = 10;
+    await bcrypt.hash(this.password, saltRounds).then(hash => {
+      this.password = hash;
+    });
+  }
+
+  async validPassword(password: string) {
+    const hashedPassword = this.password;
+    return bcrypt.compare(password, hashedPassword).then(res => res);
+  }
+
+  static attachToUser = (options: PassportOptions) => {
+
+    PassportUserSchema.findByUsername = (username: string) =>{
+      const whereClause = `${options.tableName}.${options.usernameField} = :username`;
+      const user = PassportUserSchema.createQueryBuilder(`${options.tableName}`)
+              .where(whereClause, { username })
+              .getOne();
+      return user;
+    }
+
+    PassportUserSchema.authenticate = () => {
+      return (username, password, cb) => {
+        PassportUserSchema.findByUsername(username).then(user => {
+          if(user !== undefined){
+            return user.validPassword(password);
+          } else {
+            return cb(null, false, { message: "Incorrect Password" });
+          }
+        });
+     }
+    }
+
+    PassportUserSchema.createStrategy = () => {
+      return new Strategy(options, PassportUserSchema.authenticate());
+    };
   }
 }
-

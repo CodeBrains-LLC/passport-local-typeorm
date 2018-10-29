@@ -3,8 +3,8 @@
   // ...
 import typeorm, { BeforeInsert, PrimaryGeneratedColumn, Column, BaseEntity } from 'typeorm'
 import { Strategy } from 'passport-local';
-import bcrypt from 'bcrypt';
 import PassportOptions from './PassportOptions';
+let bcrypt = require('bcryptjs')
 
 export abstract class PassportUserSchema extends BaseEntity {
   findByUsername: Promise<PassportUserSchema>;
@@ -24,18 +24,22 @@ export abstract class PassportUserSchema extends BaseEntity {
   @Column()
   verified: boolean
 
-
   @BeforeInsert()
   async hashPassword() {
     const saltRounds = 10;
-    await bcrypt.hash(this.password, saltRounds).then(hash => {
+    let password = this.password
+    this.password = bcrypt.hashSync(this.password, saltRounds)
+    /*await bcrypt.hash(password, saltRounds).then(hash => {
       this.password = hash;
-    });
+    });*/
   }
 
-  async validPassword(password: string) {
+  async validPassword(passwordInput: string) {
     const hashedPassword = this.password;
-    return bcrypt.compare(password, hashedPassword).then(res => res);
+    console.log(`The password Input is ${passwordInput} and the hash is ${hashedPassword}`)
+    console.log(`The hashed password is ${hashedPassword}`)
+    const result = await bcrypt.compare(passwordInput, hashedPassword)
+    return result;
   }
 
   static attachToUser = (options: PassportOptions) => {
@@ -65,3 +69,4 @@ export abstract class PassportUserSchema extends BaseEntity {
     };
   }
 }
+
